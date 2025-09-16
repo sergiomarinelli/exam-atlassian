@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ACP-120 Practice Quiz — Local & Shareable</title>
+  <style>
+    :root {
+      --bg: #0b0f14; --card: #121823; --muted:#94a3b8; --text:#e2e8f0; --accent:#60a5fa; --ok:#22c55e; --bad:#ef4444; --warn:#f59e0b;
+    }
+    html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font:16px/1.5 system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, "Helvetica Neue", Arial, "Apple Color Emoji", "Segoe UI Emoji"}
+    .wrap{max-width:1100px;margin:24px auto;padding:0 16px}
+    .row{display:flex;gap:12px;flex-wrap:wrap}
+    .card{background:var(--card);border:1px solid #1f2937;border-radius:16px;padding:16px;box-shadow:0 1px 0 rgba(255,255,255,0.03) inset}
+    label{font-weight:600}
+    input[type="text"],input[type="number"],select{background:#0f172a;border:1px solid #243042;color:var(--text);padding:10px 12px;border-radius:10px}
+    button{background:linear-gradient(180deg,#1f2937,#111827);color:#fff;border:1px solid #2b3648;border-radius:12px;padding:10px 14px;cursor:pointer}
+    button:hover{filter:brightness(1.1)}
+    .btn-accent{background:linear-gradient(180deg,#3b82f6,#1d4ed8);border-color:#1e40af}
+    .btn-ghost{background:#0f172a}
+    .pill{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;background:#0f172a;border:1px solid #243042;color:var(--muted)}
+    .q{padding:12px;border-radius:12px;border:1px solid #1f2937;margin-bottom:12px}
+    .q h4{margin:0 0 8px 0}
+    .opt{display:flex;gap:8px;align-items:flex-start;margin:6px 0;padding:8px;border-radius:10px;border:1px solid transparent}
+    .opt.correct{border-color:rgba(34,197,94,.5);background:rgba(34,197,94,.08)}
+    .opt.incorrect{border-color:rgba(239,68,68,.5);background:rgba(239,68,68,.06)}
+    .muted{color:var(--muted)}
+    .grid{display:grid;grid-template-columns:repeat(12,1fr);gap:12px}
+    .col-4{grid-column:span 4}
+    .col-8{grid-column:span 8}
+    .center{display:flex;align-items:center;gap:8px}
+    .divider{height:1px;background:#1f2937;margin:12px 0}
+    .score{font-size:20px;font-weight:700}
+    .hidden{display:none}
+    .right{color:var(--ok)}
+    .wrong{color:var(--bad)}
+    .warn{color:var(--warn)}
+    .table{width:100%;border-collapse:collapse}
+    .table th,.table td{border-bottom:1px solid #223047;padding:8px 6px;text-align:left}
+    @media (max-width: 800px){.col-4,.col-8{grid-column:span 12}}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="row">
+      <div class="card" style="flex:1;min-width:280px">
+        <h2>ACP-120 Practice Quiz</h2>
+        <p class="muted">Runs 100% in your browser. No server. Results are saved to <b>localStorage</b>. Export/Import to move between devices or to compete with friends.</p>
+        <div class="grid">
+          <div class="col-4">
+            <label for="playerName">Your name</label>
+            <input id="playerName" type="text" placeholder="e.g., Sergio" />
+          </div>
+          <div class="col-4">
+            <label for="questionCount"># of questions (1—200)</label>
+            <input id="questionCount" type="number" min="1" max="200" value="30" />
+          </div>
+          <div class="col-4">
+            <label for="mode">Select mode</label>
+            <select id="mode">
+              <option value="mixed" selected>Mixed (all topics)</option>
+              <option value="unseen">Favor unseen questions</option>
+              <option value="hard">Favor harder (v3) questions</option>
+            </select>
+          </div>
+        </div>
+        <div class="center" style="margin-top:12px">
+          <button class="btn-accent" id="startBtn">Start Quiz</button>
+          <button class="btn-ghost" id="resetBtn" title="Clears the current quiz only">Reset Current</button>
+          <span class="pill" id="timer">00:00</span>
+          <span class="pill" id="bankSize"></span>
+        </div>
+        <div class="divider"></div>
+        <div class="center">
+          <button id="submitBtn">Submit Answers</button>
+          <button id="revealBtn" class="btn-ghost">Reveal Correct</button>
+          <button id="saveBtn" class="btn-ghost">Save Result</button>
+        </div>
+      </div>
+      <div class="card" style="flex:1;min-width:280px">
+        <h3>History & Leaderboard</h3>
+        <div class="center">
+          <button id="exportBtn">Export History (.json)</button>
+          <input id="importFile" type="file" accept="application/json" class="hidden" />
+          <button id="importBtn" class="btn-ghost">Import</button>
+          <button id="clearHistoryBtn" class="btn-ghost">Clear All</button>
+        </div>
+        <p class="muted" style="margin:8px 0">History lives only in your browser unless you export it.</p>
+        <div id="stats"></div>
+        <div class="divider"></div>
+        <div id="leaderboard"></div>
+      </div>
+    </div>
+
+    <div class="card" id="quizCard" style="margin-top:16px">
+      <div class="center"><h3 style="margin:0">Quiz</h3><span class="pill" id="progress">0/0</span></div>
+      <p class="muted" id="tip">Pick your settings above and click <b>Start Quiz</b>.</p>
+      <div id="quiz"></div>
+      <div id="result" class="score"></div>
+    </div>
+
+    <div class="card" style="margin-top:16px">
+      <h3>How scoring & storage works</h3>
+      <ul>
+        <li>Answers are checked locally. We don’t call any server.</li>
+        <li>History is saved under <code>localStorage.acp120_quiz_history_v1</code>.</li>
+        <li>Export a JSON file to sync between devices or to build a shared leaderboard.</li>
+      </ul>
+    </div>
+  </div>
+
+<script>
+// -------- Question Bank (90) --------
+// Each entry: {q, options[4], answer: 'A'|'B'|'C'|'D', exp}
+const BANK = [];
+function Q(q, opts, ans, exp=""){return {q, opts, ans, exp}};
+
+// V1 (30)
+BANK.push(
+Q("Which scheme controls which fields appear on the create/edit/view screens of an issue?",["Permission Scheme","Workflow Scheme","Screen Scheme","Notification Scheme"],"C","Screen Scheme maps which Screen is used per operation; the Screen defines visible fields."),
+Q("You need to prevent a group of users from deleting attachments from issues. Where do you configure this?",["Permission Scheme (Manage Attachments)","Project Role","Field Configuration","Issue Security Scheme"],"A","Manage Attachments permission controls add/remove attachments."),
+Q("In Jira Cloud, what is the recommended way to avoid duplication of schemes across projects and simplify maintenance?",["Create separate schemes for each project","Use Shared Components via Confluence","Reuse/centralize schemes and associate them with projects","Export and import projects manually"],"C","Share schemes across projects."),
+Q("Which statement about workflows is correct?",["Transitions cannot have conditions","Post functions run before the transition is validated","Conditions control who can see/use the transition","Validators cannot access issue fields"],"C","Conditions govern who can execute; validators check inputs; post-functions run after."),
+Q("You want only the reporter and members of the 'support' group to transition an issue from 'Waiting' to 'Resolved'. Where should you configure this?",["Field Configuration","Condition on the workflow transition","Permission Scheme","Issue Security"],"B","Use a workflow transition condition limiting actors."),
+Q("Which type of field is not natively supported in Jira Cloud automation rules?",["Short text fields","Assets fields (with limitations)","Select list (single choice)","Number fields"],"B","Assets/CMDB fields often have limited native automation handling."),
+Q("To limit issue visibility within a project due to confidentiality, which feature should you use?",["Permission Scheme","Issue Security Scheme","Project Category","Component"],"B","Issue Security Levels restrict visibility per issue."),
+Q("A project has performance issues because there are many different schemes. Best practice:",["Consolidate and reduce the number of shared schemes","Create more schemes to divide responsibilities","Remove all workflows and use the default","Turn all fields into free-text fields"],"A","Fewer, shared schemes reduce admin overhead."),
+Q("Where do you configure SLAs and queues in Jira Service Management (JSM)?",["Permission Scheme","Project Settings → SLAs and Queues","Global Settings → Issues","Automation"],"B","Configured at JSM project settings."),
+Q("Which global permission controls who can create projects in Jira Cloud?",["Jira System Administrators","Create Projects (global permission)","Project Admins","Service Desk Team"],"B","Create Projects global permission."),
+Q("You need to move an issue across projects and map fields differently (name/type). How to avoid data loss?",["Not possible to map fields when moving","Ensure both projects share the same field ID/type or use migration tools","Copy values manually","Convert to a system field"],"B","Use same type/ID or migration assistant."),
+Q("In screens, what is the relation between Field Configuration and Screen?",["Screens define visibility/order; Field Configuration defines required/hidden/readonly","Field Configuration decides field order","Screens make fields required","They are mutually exclusive"],"A","Screens decide what/where; Field Config decides required/hidden."),
+Q("Safest way to give temporary admin access to a colleague without granting global admin?",["Give Site Admin","Add to Administrators group globally","Use Project Roles and project-level admin permissions","Share your account"],"C","Prefer project-level admin via roles."),
+Q("What are Smart Values in Jira automation?",["External workflow validation functions","Variables to access issue values (e.g., {{issue.key}})","Marketplace custom fields","Asset field types"],"B","Variables used inside rules to reference issue/context data."),
+Q("What is a performance best practice regarding custom fields?",["Always use text fields","Avoid excessive fields; plan reuse/indexing","Create one field per project","Custom fields never affect performance"],"B","Limit proliferation; reuse contexts."),
+Q("You want an email sent every time an issue transitions to 'Blocked'. Recommended solution?",["Edit Jira code","Automation rule (Issue transitioned → Send email)","Users send manually","Use Notification Scheme only"],"B","Automation trigger + email action."),
+Q("What does the 'Browse Projects' permission control?",["Who can create issues","Who can view issues in the project","Who can delete projects","Who receives notifications"],"B","Controls visibility of issues."),
+Q("What does the Audit Log in Jira Cloud do?",["Nothing","Records administrative changes (configs, groups, apps)","Shows OS system logs","Restores old workflows"],"B","Traceability for admin-level changes."),
+Q("Best practice before installing a Marketplace app that requires permissions?",["Install directly in production","Test in sandbox and review data policy","Let users test in prod","Trust vendor blindly"],"B","Validate in sandbox and review security."),
+Q("How to restrict editing a field to group 'release-managers'?",["Field Configuration → Edit Permissions","Use workflow validators/conditions or apps (e.g., ScriptRunner)","Issue Security Scheme","Screen Scheme"],"B","Gate via workflow validators or apps."),
+Q("Consequence of leaving 'Allow users to sign up' enabled without control?",["Unauthorized accounts and license overuse","No consequences","Improves performance","Makes all projects anonymous"],"A","Open signup creates licensing/security risk."),
+Q("Recommendation for heavy shared JQL filters slowing dashboards?",["Leave as is","Optimize JQL, limit refresh, cache filters","Create a gadget per issue","Migrate dashboards to Confluence"],"B","Optimize queries and refresh rate."),
+Q("Best place to review/manage webhooks and integrations?",["Project settings → Integrations or System level → Webhooks/Developer settings","Each user configures their own","Marketplace only","Issue navigator"],"A","Admin-level webhooks/integrations are managed centrally."),
+Q("What is a Field Context for a custom field?",["Doesn't exist","Defines scope (projects/issue types) and values for a custom field","Controls global permissions","Alters field type"],"B","Contexts scope where the field appears and its options."),
+Q("If you want different workflows for different issue types in the same project, which to use?",["One workflow per project only","Workflow Scheme mapping workflows to issue types","Not possible","Use conditions to simulate"],"B","Workflow Scheme maps types to workflows."),
+Q("How to audit who altered a specific field in an issue?",["Issue History (issue) and Audit Log (admin changes)","Permission Scheme","Notification Scheme","Field Configuration"],"A","Issue history shows field changes; audit log covers admin configs."),
+Q("Best approach to migrate 10 projects keeping history and attachments?",["Recreate manually","Use Jira Cloud Migration Assistant or site import/export","CSV import (history lost)","Print screens"],"B","Use migration tools to preserve history."),
+Q("In JSM, which feature allows customers to create requests by email?",["Email requests channel in Project Settings → Channels → Email requests","Notification Scheme","Permission Scheme","Webhooks"],"A","Enable Email requests channel."),
+Q("When adding a new custom field only used by 1 project and 1 issue type, recommended practice?",["Create with global context","Create Field Context limited to project and issue type","Create field twice","Make it a system field"],"B","Limit context to where needed."),
+Q("Difference between Project Role and Group?",["Roles are global and not assignable; Groups are per project","Project Roles = flexible per project; Groups = global","They are the same","Only groups control access"],"B","Groups are global; roles are per-project placeholders."),
+);
+
+// V2 (30)
+BANK.push(
+Q("Which scheme defines who can view issues in a project?",["Notification Scheme","Permission Scheme","Issue Security Scheme","Field Configuration"],"B","'Browse Projects' in the Permission Scheme governs visibility."),
+Q("What is the main purpose of an Issue Type Scheme?",["Controls which issue types are available in a project","Controls permissions for each project","Controls screen visibility","Controls workflow transitions"],"A","Assigns available issue types."),
+Q("Which global permission allows sharing filters and dashboards with everyone?",["Create Shared Objects","Browse Projects","Manage Dashboards","Global Admin"],"A","Allows sharing beyond private use."),
+Q("What is the effect of a workflow validator?",["Hides the transition","Checks inputs before completing the transition","Runs after the transition","Blocks field updates"],"B","Validators check inputs before completing."),
+Q("Which feature lets you configure mandatory fields for specific issue types?",["Field Configuration","Screen Scheme","Workflow Post Function","Project Role"],"A","Field Configuration can set required/hidden per type."),
+Q("What happens if you delete a custom field used in many issues?",["Field disappears but values stay searchable","Data is permanently lost","Values move to system field","Field is hidden but recoverable"],"B","Deleting removes stored values."),
+Q("Where do you configure global outgoing mail settings in Jira Cloud?",["Project Settings","Global Settings → System → Outgoing Mail","Notification Scheme","Automation Rules"],"B","Email server/outgoing mail is system-level."),
+Q("How can you restrict which users can create issues in a project?",["Issue Security Scheme","Permission Scheme (Create Issues)","Workflow Condition","Field Configuration"],"B","Use 'Create Issues' permission."),
+Q("Which scheme controls automatic notifications sent on issue events?",["Workflow Scheme","Permission Scheme","Notification Scheme","Project Role"],"C","Maps events to recipients."),
+Q("Which automation trigger runs every time an issue is created?",["Scheduled","Field value changed","Issue created","Transition"],"C","Use 'Issue created'."),
+Q("Which option allows different screens for Create/Edit/View?",["Screen Scheme","Field Context","Issue Type Scheme","Permission Scheme"],"A","Screen Scheme maps screens per operation."),
+Q("For different workflows for Bugs and Tasks in one project, use:",["Field Configuration Scheme","Workflow Scheme","Issue Security Scheme","Notification Scheme"],"B","Workflow Scheme maps types to workflows."),
+Q("How to give admin access to only one project?",["Global Administrator","Project Role: Administrators","Group: site-admins","Issue Security"],"B","Add to the project's Administrators role."),
+Q("Which field type is NOT available by default in Jira Cloud?",["Date Picker","Number Field","Rich Text (Wiki style)","Assets Object"],"D","Assets object fields require Assets app."),
+Q("Where do you configure default assignee for a project?",["Workflow","Project Settings → Details","Field Configuration","Notification Scheme"],"B","Project Details includes default assignee."),
+Q("Which best describes an Epic in Jira Software?",["A long-running sprint","A large body of work that can be broken into stories/tasks","A permission level","A special workflow"],"B","Epics are large work items."),
+Q("Max number of automation rule executions on free plan?",["100","500","1,000","Unlimited"],"A","Free plan ~100 global/multi-project executions."),
+Q("Purpose of Project Category?",["Groups projects for reporting/organization","Sets permissions per project","Defines SLAs","Links workflows"],"A","For grouping/filtering."),
+Q("Which scheme defines available workflows for a project?",["Workflow Scheme","Field Configuration Scheme","Notification Scheme","Permission Scheme"],"A","Workflow Scheme."),
+Q("Restrict a dashboard to certain groups via:",["Field Configuration","Dashboard Sharing Settings","Permission Scheme","Issue Security"],"B","Set sharing to groups only."),
+Q("Best practice to improve performance in large instances?",["Many unique custom fields per project","Shared schemes and limited custom fields","Complex JQL everywhere","Allow everyone admin"],"B","Reduce variance; limit fields."),
+Q("'Manage Sprints' permission controls:",["Who can close boards","Who can start/complete sprints","Who can configure workflows","Who can edit filters"],"B","Start/finish sprints, edit sprint data."),
+Q("Automation action to copy values between fields:",["Edit Issue","Clone Issue","Transition Issue","Assign Issue"],"A","Use Edit Issue with smart values."),
+Q("Hide a field across all screens in a project at:",["Screen Scheme","Field Configuration","Notification Scheme","Workflow"],"B","Hide via Field Configuration."),
+Q("JSM: allow customers to log in with Google accounts by:",["Enable SAML/SSO integration","Permission Scheme","Notification Scheme","Automation"],"A","Configure SSO/IdP."),
+Q("Track changes to field values:",["Issue History/Change Log","Permission Scheme","Field Context","Notification Scheme"],"A","Issue history shows value changes."),
+Q("Which field is always required on all issues?",["Reporter","Assignee","Description","Labels"],"A","Reporter mandatory unless special contexts."),
+Q("Bulk move multiple issues via:",["Global Settings","Bulk Change (Issue Navigator)","Automation","Workflow Condition"],"B","Bulk change supports move/edit/transition."),
+Q("Main use of Issue Collector:",["Collect attachments in bulk","Embed a form on external websites to create Jira issues","Import issues via CSV","Export issues to Confluence"],"B","Embeddable ticket form."),
+Q("Classic vs Team-managed projects:",["Classic = global schemes, Team-managed = project-level configs","Classic = admins only; Team-managed = devs only","Classic = no workflows; Team-managed = yes","Classic = free; Team-managed = paid"],"A","Difference is where configs live."),
+);
+
+// V3 (30 hard)
+BANK.push(
+Q("A workflow transition has both a condition and a validator. Which executes first?",["Condition","Validator","Post-function","Notification"],"A","Transition availability (conditions) is checked before validators run."),
+Q("In Jira Cloud, which permission is required to edit a project’s workflows?",["Browse Projects","Administer Projects","Create Issues","Manage Dashboards"],"B","Project-level 'Administer Projects' allows editing project configurations."),
+Q("External customers can create requests but not consume a license — configure:",["Jira Software project","Jira Service Management (customer accounts)","Global permission","Field Configuration"],"B","JSM customers don't consume agent licenses."),
+Q("If you change a custom field’s context to only one project, values in other projects are:",["Still accessible","Hidden but retained","Permanently deleted","Converted to labels"],"B","Values become out of scope and hidden, not deleted."),
+Q("Automation action to link issues automatically based on field values:",["Clone Issue","Link Issues","Branch Rule","Assign Issue"],"B","Use 'Link issues' with smart values/conditions."),
+Q("When you archive a project in Jira Cloud:",["Issues remain searchable but read-only","Issues are deleted","Users retain write access","Notifications still send"],"A","Archived projects are read-only/hidden."),
+Q("Ensure only a specific email domain can sign up:",["Permission Scheme","Domain verification in site administration","Project Role","Issue Security"],"B","Verify and enforce allowed domains at site level."),
+Q("Company-managed vs Team-managed:",["Company-managed uses global schemes; Team-managed uses project-level configs","Company-managed is free; Team-managed is paid","Company-managed lacks workflows","Team-managed requires site-admin"],"A","Key difference is configuration scope."),
+Q("Automation smart value for current date/time:",["{{now}}","{{date}}","{{currentDate}}","{{today}}"],"A","Use {{now}} in rules."),
+Q("Field always required and cannot be removed:",["Reporter","Description","Assignee","Priority"],"A","Reporter is mandatory by design."),
+Q("Apply different notification schemes to different projects by:",["One scheme per project","Global notifications only","Workflow scheme mapping","Project category"],"A","Associate notification scheme per project."),
+Q("Prevent accidental project deletion:",["Enable deletion audit log","Restrict global 'Delete Projects' to very few admins","Use Issue Security","Disable project roles"],"B","Least privilege on destructive permissions."),
+Q("User in 'Developers' role cannot see issues — likely missing:",["Create Issues","Browse Projects","Manage Sprints","Transition Issues"],"B","Without 'Browse Projects' they won't see issues."),
+Q("Map custom fields only to certain issue types using:",["Field Context","Screen Scheme","Workflow","Project Role"],"A","Field contexts can be scoped."),
+Q("Max custom fields recommended (performance guidance):",["500","1,000","5,000","Unlimited"],"B","Keep fields well below ~1,000; depends on usage."),
+Q("Permission to configure project components:",["Administer Projects","Browse Projects","Assign Issues","Global Admin"],"A","Project admins can manage components."),
+Q("Field type not supported by default CSV import:",["Single-line text","Multi-select","Assets object fields","Priority"],"C","Assets objects need apps/API."),
+Q("Two workflows associated with different issue types are configured at:",["Workflow Scheme","Field Configuration","Issue Type Scheme","Screen"],"A","Workflow Scheme maps types to workflows."),
+Q("Automation rule scope with broadest control:",["Project rule","Global rule","Branch rule","Issue-level rule"],"B","Global rules target multiple projects (plan limits apply)."),
+Q("Assign a user to a project role but without global product access →",["They gain full access","They cannot log in","They see project but not issues","They auto-upgrade"],"B","Product access required to log in."),
+Q("Permission required for backlog grooming in Jira Software:",["Manage Sprints","Schedule Issues","Transition Issues","Create Issues"],"B","Scheduling/ranking requires 'Schedule Issues'."),
+Q("Purpose of an Issue Security Level:",["Restrict who can see an issue","Restrict who can edit fields","Control SLA targets","Control workflow conditions"],"A","Visibility control per issue."),
+Q("Team-managed project admins can:",["Configure only their project without global admin rights","Need site-admin role","Change global schemes","Not change workflows"],"A","Team-managed allows local config."),
+Q("Configure which issue types are available in a project at:",["Issue Type Scheme","Field Configuration","Workflow Scheme","Screen Scheme"],"A","Issue Type Scheme defines available types."),
+Q("Setting that defines default priority for new issues:",["Workflow","Field Configuration","Project Details → Priority Scheme","Notification Scheme"],"C","Priority Scheme / project details."),
+Q("Disabling a user account in Jira Cloud:",["User loses access; issues remain assigned","User and issues are deleted","Access lost; issues reassigned to admin","User keeps JSM access"],"A","Assignments persist; user can't log in."),
+Q("Track changes to project-level settings at:",["Audit Log","Issue History","Dashboard","Reports"],"A","Audit log covers admin changes."),
+Q("Automation action that clones an issue including subtasks:",["Clone Issue","Branch Rule","Create Issue","Copy Value"],"A","Clone action can include subtasks option."),
+Q("Main automation limitation on free Jira Cloud plans:",["No automation","~100 global/multi-project rule executions/month","Only admins can use automation","Rules expire after 30 days"],"B","Free has a small execution quota."),
+Q("Safest way to test a new automation rule before applying widely:",["Run in production immediately","Use 'Rule testing' or a test project first","Export/import XML","Copy to all projects"],"B","Test with sample issues or sandbox first."),
+);
+
+// -------- Storage helpers --------
+const LS_KEY = 'acp120_quiz_history_v1';
+const SETTINGS_KEY = 'acp120_quiz_settings_v1';
+function loadHistory(){ try{ return JSON.parse(localStorage.getItem(LS_KEY)||'{"users":{}}'); }catch(e){ return {users:{}} } }
+function saveHistory(h){ localStorage.setItem(LS_KEY, JSON.stringify(h)); }
+function loadSettings(){ try{ return JSON.parse(localStorage.getItem(SETTINGS_KEY)||'{}'); }catch(e){ return {} } }
+function saveSettings(s){ localStorage.setItem(SETTINGS_KEY, JSON.stringify(s)); }
+
+// -------- Quiz state --------
+let current = { name:"", startedAt:null, durationSec:0, questions:[], answers:{}, submitted:false };
+let timerInt = null;
+
+function shuffle(a){ for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]] } return a }
+function sampleQuestions(n, mode){
+  let indices = [...Array(BANK.length).keys()];
+  if(mode === 'hard'){ // push v3 (last 30) to front
+    const hard = indices.slice(BANK.length-30);
+    const rest = indices.slice(0, BANK.length-30);
+    indices = [...hard, ...rest];
+  }
+  if(mode === 'unseen'){
+    // favor items with lowest seenCount in history
+    const seen = seenMap();
+    indices.sort((i,j)=> (seen[i]||0) - (seen[j]||0));
+  } else {
+    indices = shuffle(indices);
+  }
+  const out = [];
+  let k = 0;
+  while(out.length<n){ out.push(indices[k % indices.length]); k++; }
+  return out.map(i=> ({...BANK[i], bankIndex:i}));
+}
+function seenMap(){
+  const h = loadHistory();
+  const counts = {};
+  Object.values(h.users||{}).flat().forEach(attempt=>{
+    (attempt.qIndices||[]).forEach(i=>{ counts[i]=(counts[i]||0)+1; });
+  });
+  return counts;
+}
+
+function startQuiz(){
+  const name = document.getElementById('playerName').value.trim() || 'Player';
+  const count = Math.max(1, Math.min(200, parseInt(document.getElementById('questionCount').value)||30));
+  const mode = document.getElementById('mode').value;
+  current = { name, startedAt: Date.now(), durationSec:0, questions: sampleQuestions(count, mode), answers:{}, submitted:false };
+  saveSettings({name, count, mode});
+  renderQuiz();
+  startTimer();
+}
+
+function startTimer(){ clearInterval(timerInt); const t = document.getElementById('timer'); const start = Date.now();
+  timerInt = setInterval(()=>{ const s = Math.floor((Date.now()-current.startedAt)/1000); current.durationSec = s; const m=Math.floor(s/60), r=s%60; t.textContent = `${String(m).padStart(2,'0')}:${String(r).padStart(2,'0')}`; }, 500);
+}
+function stopTimer(){ clearInterval(timerInt); timerInt=null; }
+
+function renderQuiz(){
+  const qEl = document.getElementById('quiz'); qEl.innerHTML='';
+  document.getElementById('tip').classList.add('hidden');
+  document.getElementById('progress').textContent = `0/${current.questions.length}`;
+  current.questions.forEach((item, idx)=>{
+    const qDiv = document.createElement('div'); qDiv.className='q';
+    qDiv.innerHTML = `<h4>${idx+1}. ${item.q}</h4>` + item.opts.map((opt,i)=>{
+      const letter = String.fromCharCode(65+i);
+      const id = `q${idx}_${letter}`;
+      return `<label class="opt"><input type="radio" name="q${idx}" id="${id}" value="${letter}" /> <span><b>${letter})</b> ${opt}</span></label>`
+    }).join('');
+    qEl.appendChild(qDiv);
+  });
+  updateProgress();
+  document.getElementById('result').textContent='';
+}
+
+function updateProgress(){
+  const n = current.questions.length;
+  const answered = Object.keys(current.answers).length;
+  document.getElementById('progress').textContent = `${answered}/${n}`;
+}
+
+document.addEventListener('change', (e)=>{
+  if(!e.target.name) return;
+  if(!e.target.name.startsWith('q')) return;
+  const [_, idx] = e.target.name.match(/^q(\d+)/) || [];
+  if(idx===undefined) return;
+  current.answers[idx] = e.target.value; // A-D
+  updateProgress();
+});
+
+function submitAnswers(){
+  if(!current.questions.length) return;
+  current.submitted = true; stopTimer();
+  let correct=0; const detailed=[];
+  current.questions.forEach((item, idx)=>{
+    const pick = current.answers[idx] || null;
+    const isOk = pick === item.ans; if(isOk) correct++;
+    detailed.push({idx, bankIndex:item.bankIndex, pick, correct:item.ans, ok:isOk});
+  });
+  // decorate UI
+  detailed.forEach(({idx,pick,correct:ans})=>{
+    ['A','B','C','D'].forEach(letter=>{
+      const label = document.querySelector(`#q${idx}_${letter}`).closest('.opt');
+      label.classList.remove('correct','incorrect');
+      if(letter===ans) label.classList.add('correct');
+      if(pick && letter===pick && pick!==ans) label.classList.add('incorrect');
+    });
+  });
+  const pct = Math.round((correct/current.questions.length)*100);
+  document.getElementById('result').innerHTML = `Score: <span class="right">${correct}</span> / ${current.questions.length} &nbsp; (<span class="right">${pct}%</span>)`;
+  return {correct, pct, detailed};
+}
+
+function revealCorrect(){
+  if(!current.questions.length) return;
+  current.questions.forEach((item, idx)=>{
+    const ans = item.ans;
+    ['A','B','C','D'].forEach(letter=>{
+      const label = document.querySelector(`#q${idx}_${letter}`).closest('.opt');
+      label.classList.remove('correct','incorrect');
+      if(letter===ans) label.classList.add('correct');
+    });
+  });
+}
+
+function saveResult(){
+  if(!current.submitted){ var s=submitAnswers(); if(!s) return; }
+  const {correct, pct, detailed} = submitAnswers();
+  const h = loadHistory(); h.users = h.users || {};
+  const arr = h.users[current.name] || [];
+  arr.push({ at: Date.now(), name: current.name, n: current.questions.length, correct, pct, secs: current.durationSec, qIndices: current.questions.map(q=>q.bankIndex), detailed });
+  h.users[current.name] = arr; saveHistory(h); renderStats(); alert('Result saved to local history!');
+}
+
+function renderStats(){
+  const h = loadHistory(); const users = h.users || {};
+  // current user stats
+  const name = document.getElementById('playerName').value.trim() || 'Player';
+  const mine = users[name] || [];
+  const attempts = mine.length;
+  const avg = attempts? Math.round(mine.reduce((s,a)=>s+a.pct,0)/attempts):0;
+  const best = attempts? Math.max(...mine.map(a=>a.pct)):0;
+  const last = mine[attempts-1];
+  const statsDiv = document.getElementById('stats');
+  statsDiv.innerHTML = `
+    <p><b>${name}</b> — Attempts: <b>${attempts}</b> · Avg: <b>${avg}%</b> · Best: <b>${best}%</b></p>
+    ${last? `<p class="muted">Last: ${new Date(last.at).toLocaleString()} — ${last.correct}/${last.n} (${last.pct}%) in ${Math.round(last.secs/60)}m</p>`: ''}
+    ${attempts? renderTable(mine.slice(-10).reverse(), ['When','Score','Size','Time','Pct'], r=>[
+      new Date(r.at).toLocaleString(), `${r.correct}/${r.n}`, r.n, `${Math.round(r.secs/60)}m`, `${r.pct}%`
+    ]): '<p class="muted">No attempts yet.</p>'}
+  `;
+
+  // leaderboard
+  const all = Object.entries(users).map(([k,v])=>({name:k, attempts:v.length, best: v.length? Math.max(...v.map(a=>a.pct)) : 0, avg: v.length? Math.round(v.reduce((s,a)=>s+a.pct,0)/v.length):0 }));
+  all.sort((a,b)=> b.best - a.best || b.avg - a.avg);
+  const lbDiv = document.getElementById('leaderboard');
+  lbDiv.innerHTML = renderTable(all, ['Name','Attempts','Best','Avg'], r=>[r.name, r.attempts, r.best+'%', r.avg+'%']);
+}
+
+function renderTable(rows, headers, mapFn){
+  let html = '<table class="table"><thead><tr>' + headers.map(h=>`<th>${h}</th>`).join('') + '</tr></thead><tbody>';
+  rows.forEach(r=>{ const cells = mapFn(r); html += '<tr>' + cells.map(c=>`<td>${c}</td>`).join('') + '</tr>'; });
+  html += '</tbody></table>'; return html;
+}
+
+// Export/Import
+function exportHistory(){ const blob = new Blob([localStorage.getItem(LS_KEY) || '{"users":{}}'], {type:'application/json'}); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'acp120_history.json'; a.click(); }
+function importHistory(file){ const reader = new FileReader(); reader.onload = ()=>{ try{ const data = JSON.parse(reader.result); if(!data.users) throw new Error('Invalid file'); saveHistory(data); renderStats(); alert('History imported!'); }catch(e){ alert('Invalid JSON file.'); } }; reader.readAsText(file); }
+
+// UI bindings
+const bankSize = document.getElementById('bankSize'); bankSize.textContent = `Bank: ${BANK.length} questions`;
+
+document.getElementById('startBtn').addEventListener('click', startQuiz);
+
+document.getElementById('submitBtn').addEventListener('click', submitAnswers);
+
+document.getElementById('revealBtn').addEventListener('click', revealCorrect);
+
+document.getElementById('saveBtn').addEventListener('click', saveResult);
+
+document.getElementById('resetBtn').addEventListener('click', ()=>{ current={ name: current.name, startedAt:null, durationSec:0, questions:[], answers:{}, submitted:false }; document.getElementById('quiz').innerHTML=''; document.getElementById('result').textContent=''; document.getElementById('tip').classList.remove('hidden'); stopTimer(); document.getElementById('progress').textContent='0/0'; document.getElementById('timer').textContent='00:00'; });
+
+document.getElementById('exportBtn').addEventListener('click', exportHistory);
+
+document.getElementById('importBtn').addEventListener('click', ()=> document.getElementById('importFile').click());
+
+document.getElementById('importFile').addEventListener('change', (e)=>{ if(e.target.files[0]) importHistory(e.target.files[0]); });
+
+// Clear history
+ document.getElementById('clearHistoryBtn').addEventListener('click', ()=>{ if(confirm('Erase ALL local history?')){ localStorage.removeItem(LS_KEY); renderStats(); }});
+
+// Restore settings
+(function(){ const s = loadSettings(); if(s.name) document.getElementById('playerName').value=s.name; if(s.count) document.getElementById('questionCount').value=s.count; if(s.mode) document.getElementById('mode').value=s.mode; renderStats(); })();
+</script>
+</body>
+</html>
