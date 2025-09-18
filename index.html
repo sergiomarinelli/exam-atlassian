@@ -53,7 +53,11 @@
           </div>
           <div class="col-4">
             <label for="questionCount"># of questions (1—200)</label>
+<<<<<<< HEAD
+            <input id="questionCount" type="number" min="1" max="300" value="30" />
+=======
             <input id="questionCount" type="number" min="1" max="200" value="30" />
+>>>>>>> c2582e9d6bc1cbaeaa4821ebc345c20648cc8986
           </div>
           <div class="col-4">
             <label for="mode">Select mode</label>
@@ -217,6 +221,61 @@ Q("Main automation limitation on free Jira Cloud plans:",["No automation","~100 
 Q("Safest way to test a new automation rule before applying widely:",["Run in production immediately","Use 'Rule testing' or a test project first","Export/import XML","Copy to all projects"],"B","Test with sample issues or sandbox first."),
 );
 
+<<<<<<< HEAD
+
+// ---- Auto-expand bank to 300 by generating paraphrased variants of existing items ----
+(function ensureThreeHundred(){
+  try{
+    const TARGET = 300;
+    if (BANK.length >= TARGET) return;
+    const ABCD = ['A','B','C','D'];
+    const openers = [
+      "In Jira Cloud, ",
+      "Exam-style: ",
+      "Select the BEST answer: ",
+      "Consider this scenario: ",
+      "Quick check — ",
+      ""
+    ];
+    function paraphrase(stem){
+      const opener = openers[Math.floor(Math.random()*openers.length)];
+      // Simple stem tweaks
+      const tweaks = [
+        s => s.replace(/\bWhich\b/i, "Which ONE"),
+        s => s.replace(/\bWhat\b/i, "What is"),
+        s => s.replace(/\bBest practice\b/i, "Recommended best practice"),
+        s => s.replace(/\bWhere do you\b/i, "Where should you"),
+        s => s
+      ];
+      const t = tweaks[Math.floor(Math.random()*tweaks.length)];
+      return opener + t(stem);
+    }
+    function cloneWithShuffle(item){
+      const opts = item.opts.slice();
+      // Fisher-Yates shuffle
+      for(let i=opts.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [opts[i],opts[j]]=[opts[j],opts[i]]; }
+      const correctText = item.opts['ABCD'.indexOf(item.ans)];
+      const newIndex = opts.indexOf(correctText);
+      const ans = ABCD[newIndex];
+      return Q(paraphrase(item.q), opts, ans, item.exp || "");
+    }
+    let i = 0;
+    const seed = BANK.slice(); // use current items as seeds
+    while(BANK.length < TARGET){
+      const base = seed[i % seed.length];
+      const variant = cloneWithShuffle(base);
+      // Avoid exact duplicate stems
+      if (!BANK.some(q => q.q === variant.q)){
+        BANK.push(variant);
+      }
+      i++;
+      if (i > 5000) break; // safety
+    }
+  }catch(e){ console.warn('BANK expansion error', e); }
+})();
+
+=======
+>>>>>>> c2582e9d6bc1cbaeaa4821ebc345c20648cc8986
 // -------- Storage helpers --------
 const LS_KEY = 'acp120_quiz_history_v1';
 const SETTINGS_KEY = 'acp120_quiz_settings_v1';
